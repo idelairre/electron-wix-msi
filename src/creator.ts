@@ -34,7 +34,8 @@ export interface MSICreatorOptions {
   signWithParams?: string;
   certificateFile?: string;
   certificatePassword?: string;
-  arch?: 'x64' | 'ia64'| 'x86';
+  arch?: 'x64' | 'ia64' | 'x86';
+  desktop?: boolean;
 }
 
 export interface UIOptions {
@@ -62,6 +63,9 @@ export class MSICreator {
   public uiDirTemplate = getTemplate('ui-choose-dir');
   public propertyTemplate = getTemplate('property');
 
+  public desktopShortcutDirectoryTemplate = getTemplate('desktop-shortcut-directory');
+  public desktopShortcutComponentRefTemplate = getTemplate('desktop-shortcut-component-ref');
+
   // State, overwritable beteween steps
   public wxsFile: string = '';
 
@@ -84,7 +88,7 @@ export class MSICreator {
   public certificateFile?: string;
   public certificatePassword?: string;
   public signWithParams?: string;
-  public arch: 'x64' | 'ia64'| 'x86' = 'x86';
+  public arch: 'x64' | 'ia64' | 'x86' = 'x86';
 
   public ui: UIOptions | boolean;
 
@@ -92,6 +96,7 @@ export class MSICreator {
   private directories: Array<string> = [];
   private tree: FileFolderTree | undefined;
   private components: Array<Component> = [];
+  private desktop?: boolean;
 
   constructor(options: MSICreatorOptions) {
     this.appDirectory = path.normalize(options.appDirectory);
@@ -117,6 +122,7 @@ export class MSICreator {
       || `com.squirrel.${this.shortName}.${this.exe}`;
 
     this.ui = options.ui !== undefined ? options.ui : false;
+    this.desktop = options.desktop || false;
   }
 
   /**
@@ -188,7 +194,9 @@ export class MSICreator {
     const scaffoldReplacements = {
       '<!-- {{ComponentRefs}} -->': componentRefs.map(({ xml }) => xml).join('\n'),
       '<!-- {{Directories}} -->': directories,
-      '<!-- {{UI}} -->': this.getUI()
+      '<!-- {{UI}} -->': this.getUI(),
+      '<!-- {{DesktopShortcutDirectory}} -->': this.getDesktopShortcutDirectory(),
+      '<!-- {{DesktopComponentRef}} -->': this.getDesktopComponentRef()
     };
 
     const replacements = {
@@ -206,8 +214,8 @@ export class MSICreator {
       '{{Version}}': this.version,
       '{{Platform}}': this.arch,
       '{{ProgramFilesFolder}}': this.arch === 'x86' ? 'ProgramFilesFolder' : 'ProgramFiles64Folder',
-      '{{ProcessorArchitecture}}' : this.arch,
-      '{{Win64YesNo}}' : this.arch === 'x86' ? 'no' : 'yes',
+      '{{ProcessorArchitecture}}': this.arch,
+      '{{Win64YesNo}}': this.arch === 'x86' ? 'no' : 'yes',
     };
 
     const completeTemplate = replaceInString(this.wixTemplate, scaffoldReplacements);
@@ -256,7 +264,7 @@ export class MSICreator {
 
     const preArgs = flatMap(this.extensions.map((e) => (['-ext', e])));
 
-    const { code, stderr, stdout } = await spawnPromise(binary, [ ...preArgs, input ], {
+    const { code, stderr, stdout } = await spawnPromise(binary, [...preArgs, input], {
       env: process.env,
       cwd
     });
@@ -291,7 +299,7 @@ export class MSICreator {
       ? signWithParams.match(/(?:[^\s"]+|"[^"]*")+/g) as Array<string>
       : ['/a', '/f', path.resolve(certificateFile!), '/p', certificatePassword!];
 
-    const { code, stderr, stdout } = await spawnPromise(signToolPath, [ 'sign', ...args, msiFile ], {
+    const { code, stderr, stdout } = await spawnPromise(signToolPath, ['sign', ...args, msiFile], {
       env: process.env,
       cwd: path.join(__dirname, '../vendor'),
     });
@@ -348,9 +356,9 @@ export class MSICreator {
       .map((key) => {
         return propertyMap[key]
           ? replaceInString(this.propertyTemplate, {
-              '{{Key}}': propertyMap[key],
-              '{{Value}}': (images as any)[key]
-            })
+            '{{Key}}': propertyMap[key],
+            '{{Value}}': (images as any)[key]
+          })
           : '';
       })
       .join('\n');
@@ -444,6 +452,27 @@ export class MSICreator {
     });
 
     return { guid, componentId, xml, file };
+  }
+
+  private getDesktopShortcutDirectory(): string {
+    if (!this.desktop) {
+      return '';
+    }
+    const xml = replaceInString(this.desktopShortcutDirectoryTemplate, {
+      '{{ApplicationBinary}}': this.exe,
+      '{{ApplicationDescription}}': this.description,
+      '{{ApplicationName}}': this.name,
+      '{{ApplicationShortcutGuid}}': uuid(),
+      '{{ApplicationShortName}}': this.shortName,
+    });
+    return xml;
+  }
+
+  private getDesktopComponentRef(): string {
+    if (!this.desktop) {
+      return '';
+    }
+    return this.desktopShortcutComponentRefTemplate;
   }
 
   /**

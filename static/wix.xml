@@ -32,6 +32,7 @@
 
     <!-- Step 2: Add files and directories -->
     <Directory Id="TARGETDIR" Name="SourceDir">
+      <!-- {{DesktopShortcutDirectory}} -->
       <!-- Installation files to %PROGRAMFILES% -->
       <Directory Id="{{ProgramFilesFolder}}">
 <!-- {{Directories}} -->
@@ -66,6 +67,7 @@
     <Feature Id="MainApplication" Title="Main Application" Level="1">
 <!-- {{ComponentRefs}} -->
       <ComponentRef Id="ApplicationShortcut" />
+       <!-- {{DesktopComponentRef}} -->
     </Feature>
   </Product>
 </Wix>

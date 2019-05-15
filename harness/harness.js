@@ -14,15 +14,16 @@ async function clean() {
 async function harness() {
   const msiCreator = new MSICreator({
     appDirectory: APP_DIR,
-    exe: 'slack',
-    manufacturer: 'Slack Technologies',
-    name: 'Slack',
+    exe: 'test',
+    manufacturer: 'Test',
+    name: 'Test',
     outputDirectory: OUT_DIR,
     description: 'Test',
     ui: {
       chooseDirectory: true
     },
-    version: '1.2.3.4'
+    version: '1.2.3.4',
+    desktop: true
   });
 
   await msiCreator.create();
